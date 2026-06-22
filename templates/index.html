@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spare Part Recognition</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; min-height: 100vh; }
+
+  .branding { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .branding-logo { height: 52px; width: auto; object-fit: contain; }
+  .branding-company { font-size: 1rem; font-weight: 700; color: #000; letter-spacing: -0.01em; }
+  .branding-title { font-size: 0.82rem; color: #999; margin-top: 2px; font-weight: 500; letter-spacing: 0.02em; }
+
+  .container { max-width: 720px; margin: 0 auto; padding: 32px 16px; }
+
+  .card    { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+  .card h2 { font-size: 0.72rem; font-weight: 700; color: #aaa; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  /* ── Tabs ── */
+  .tab-bar { display: flex; gap: 2px; margin-bottom: 20px; background: #f0f0f0; border-radius: 8px; padding: 4px; }
+  .tab-btn { flex: 1; padding: 8px 0; border: none; border-radius: 6px; background: transparent; color: #999; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em; }
+  .tab-btn.active { background: #fff; color: #000; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .tab-btn:hover:not(.active) { color: #555; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── Drop Zone ── */
+  .drop-zone { border: 1px dashed #ccc; border-radius: 10px; padding: 48px 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #000; background: #f5f5f5; }
+  .drop-zone input[type=file] { display: none; }
+  .drop-zone .dz-icon { font-size: 2rem; margin-bottom: 12px; color: #bbb; }
+  .drop-zone p     { color: #888; margin-bottom: 6px; font-size: 0.9rem; }
+  .drop-zone .hint { font-size: 0.76rem; color: #bbb; }
+
+  /* ── Camera ── */
+  .camera-wrap { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 4/3; }
+  #cameraVideo { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .camera-overlay { position: absolute; bottom: 16px; left: 0; right: 0; display: flex; justify-content: center; gap: 12px; }
+  .cam-btn { width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .cam-btn-capture { background: #fff; color: #000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .cam-btn-capture:hover { background: #e0e0e0; }
+  .cam-btn-flip { background: rgba(255,255,255,0.15); color: #fff; }
+  .cam-btn-flip:hover { background: rgba(255,255,255,0.25); }
+  #canvasCapture { display: none; }
+  .cam-start-wrap { text-align: center; padding: 40px 24px; background: #fafafa; border-radius: 10px; border: 1px dashed #ccc; }
+  .cam-start-wrap p { color: #888; font-size: 0.88rem; margin-bottom: 16px; }
+
+  /* ── Base64 ── */
+  .b64-textarea { width: 100%; height: 130px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; color: #333; font-family: 'Courier New', monospace; font-size: 0.76rem; padding: 12px; resize: vertical; outline: none; line-height: 1.5; }
+  .b64-textarea:focus { border-color: #000; }
+  .b64-textarea::placeholder { color: #ccc; }
+  .b64-hint { font-size: 0.76rem; color: #bbb; margin-top: 8px; }
+  .b64-hint code { color: #888; }
+
+  /* ── Preview ── */
+  .preview-wrap     { display: none; text-align: center; margin: 16px 0; }
+  .preview-wrap img { max-height: 260px; border-radius: 8px; border: 1px solid #e0e0e0; }
+  .b64-preview-wrap     { display: none; text-align: center; margin: 12px 0; }
+  .b64-preview-wrap img { max-height: 200px; border-radius: 8px; border: 1px solid #e0e0e0; }
+  .cam-preview-wrap     { display: none; text-align: center; margin: 12px 0; }
+  .cam-preview-wrap img { max-height: 260px; border-radius: 8px; border: 1px solid #e0e0e0; }
+
+  /* ── Buttons ── */
+  .btn         { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.88rem; font-weight: 600; transition: all 0.2s; letter-spacing: 0.01em; }
+  .btn-primary { background: #000; color: #fff; }
+  .btn-primary:hover    { background: #222; }
+  .btn-primary:disabled { background: #e0e0e0; color: #aaa; cursor: not-allowed; }
+  .btn-ghost { background: #fff; color: #555; border: 1px solid #ddd; }
+  .btn-ghost:hover { background: #f5f5f5; color: #000; }
+  .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+  /* ── Result ── */
+  .result-box { display: none; }
+  .item-name  { font-size: 1.8rem; font-weight: 700; color: #000; margin-bottom: 10px; word-break: break-word; line-height: 1.2; letter-spacing: -0.03em; }
+  .meta-row   { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+  .badge      { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; background: #f0f0f0; color: #333; border: 1px solid #ddd; }
+  .conf-tag   { font-size: 0.78rem; color: #999; }
+  .conf-HIGH   { color: #000; font-weight: 700; }
+  .conf-MEDIUM { color: #666; font-weight: 700; }
+  .conf-LOW    { color: #bbb; font-weight: 700; }
+  .score-tag  { font-size: 0.78rem; color: #bbb; }
+
+  .divider { border: none; border-top: 1px solid #f0f0f0; margin: 16px 0; }
+
+  .bar-row   { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .bar-label { width: 110px; font-size: 0.74rem; color: #999; flex-shrink: 0; letter-spacing: 0.03em; }
+  .bar-bg    { flex: 1; background: #f0f0f0; border-radius: 2px; height: 6px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 2px; background: #000; transition: width 0.6s ease; }
+  .bar-val   { width: 40px; text-align: right; font-size: 0.74rem; color: #bbb; flex-shrink: 0; }
+
+  .info-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .info-item label { font-size: 0.68rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 4px; }
+  .info-item span  { font-size: 0.88rem; color: #333; }
+
+  .reason-box { background: #fafafa; border-left: 2px solid #ddd; padding: 10px 14px; border-radius: 4px; font-size: 0.82rem; color: #777; margin-top: 12px; line-height: 1.6; }
+
+  .loading { display: none; text-align: center; padding: 32px; }
+  .spinner { width: 24px; height: 24px; border: 2px solid #e0e0e0; border-top-color: #000; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { font-size: 0.85rem; color: #999; }
+
+  .action-row { text-align: center; margin-top: 16px; display: flex; gap: 8px; justify-content: center; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="branding">
+    <img src="{{ url_for('static', filename='logo_srp.webp') }}" alt="Logo SRP" class="branding-logo">
+    <div>
+      <div class="branding-company">PT Sinar Rimba Pasifik</div>
+      <div class="branding-title"> <b>SIRA</b> - AI Image Recognition</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('upload')">Upload</button>
+      <button class="tab-btn"        onclick="switchTab('camera')">Kamera</button>
+      <button class="tab-btn"        onclick="switchTab('base64')">Base64</button>
+    </div>
+
+    <!-- Tab: Upload -->
+    <div class="tab-pane active" id="pane-upload">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="dz-icon">&#128247;</div>
+        <p>Klik atau drag &amp; drop gambar di sini</p>
+        <div class="hint">PNG, JPG, JPEG, BMP, WEBP &mdash; maks 16 MB</div>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+      <div class="preview-wrap" id="previewWrap">
+        <img id="previewImg" src="" alt="preview">
+      </div>
+      <div class="action-row" id="uploadActionRow" style="display:none;">
+        <button class="btn btn-ghost btn-sm" onclick="resetUpload()">Upload Ulang</button>
+        <button class="btn btn-primary" id="analyzeBtnUpload" onclick="analyzeUpload()">Kenali Gambar</button>
+      </div>
+    </div>
+
+    <!-- Tab: Camera -->
+    <div class="tab-pane" id="pane-camera">
+      <div id="camStartWrap" class="cam-start-wrap">
+        <p>Gunakan kamera untuk mengambil foto spare part secara langsung.</p>
+        <button class="btn btn-primary" onclick="startCamera()">Buka Kamera</button>
+      </div>
+      <div id="camLiveWrap" style="display:none;">
+        <div class="camera-wrap">
+          <video id="cameraVideo" autoplay playsinline></video>
+          <div class="camera-overlay">
+            <button class="cam-btn cam-btn-flip" onclick="flipCamera()" title="Ganti kamera">&#8635;</button>
+            <button class="cam-btn cam-btn-capture" onclick="capturePhoto()" title="Ambil foto">&#9711;</button>
+          </div>
+        </div>
+      </div>
+      <canvas id="canvasCapture"></canvas>
+      <div class="cam-preview-wrap" id="camPreviewWrap">
+        <img id="camPreviewImg" src="" alt="captured">
+      </div>
+      <div class="action-row" id="camActionRow" style="display:none;">
+        <button class="btn btn-ghost btn-sm" onclick="retakePhoto()">Foto Ulang</button>
+        <button class="btn btn-primary" id="analyzeBtnCam" onclick="analyzeCam()">Kenali Gambar</button>
+      </div>
+    </div>
+
+    <!-- Tab: Base64 -->
+    <div class="tab-pane" id="pane-base64">
+      <div id="b64InputWrap">
+        <textarea class="b64-textarea" id="b64Input"
+          placeholder="Paste base64 string di sini...&#10;&#10;Format yang didukung:&#10;  Raw base64 : /9j/4AAQSkZJRgAB...&#10;  Data URI   : data:image/jpeg;base64,/9j/4AAQ..."
+          oninput="onB64Input()"></textarea>
+        <p class="b64-hint">Bisa langsung paste hasil <code>canvas.toDataURL()</code> atau base64 dari sumber lain.</p>
+      </div>
+      <div class="b64-preview-wrap" id="b64PreviewWrap">
+        <img id="b64PreviewImg" src="" alt="preview">
+      </div>
+      <div class="action-row" id="b64ActionRow">
+        <button class="btn btn-ghost btn-sm" id="b64ResetBtn" onclick="clearB64()" style="display:none;">Ganti</button>
+        <button class="btn btn-primary" id="analyzeBtnB64" disabled onclick="analyzeB64()">Kenali Gambar</button>
+      </div>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Menganalisis gambar...</p>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="card result-box" id="resultBox">
+    <h2>Hasil Pengenalan</h2>
+    <div class="item-name" id="itemNameDisplay">-</div>
+    <div class="meta-row">
+      <span id="catBadge" class="badge">-</span>
+      <span class="conf-tag">Confidence: <span id="confVal">-</span></span>
+      <span class="score-tag" id="scoreText"></span>
+    </div>
+    <div class="info-grid">
+      <div class="info-item"><label>Deskripsi Kategori</label><span id="itemDesc">-</span></div>
+    </div>
+    <div class="reason-box" id="reasonBox" style="display:none;"></div>
+    <hr class="divider">
+    <h2 style="margin-bottom:12px;">Skor per Kategori</h2>
+    <div id="barsContainer"></div>
+  </div>
+</div>
+
+<script>
+// ── Tab ───────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  const names = ['upload','camera','base64'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', names[i] === name));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + name).classList.add('active');
+  document.getElementById('resultBox').style.display = 'none';
+  if (name !== 'camera') stopCamera();
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+document.getElementById('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+let selectedFile = null;
+
+function handleFile(f) {
+  if (!f) return;
+  selectedFile = f;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('dropZone').style.display      = 'none';
+    document.getElementById('previewWrap').style.display   = 'block';
+    document.getElementById('uploadActionRow').style.display = 'flex';
+    document.getElementById('resultBox').style.display     = 'none';
+  };
+  reader.readAsDataURL(f);
+}
+
+function resetUpload() {
+  selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('previewImg').src  = '';
+  document.getElementById('dropZone').style.display       = 'block';
+  document.getElementById('previewWrap').style.display    = 'none';
+  document.getElementById('uploadActionRow').style.display = 'none';
+  document.getElementById('resultBox').style.display      = 'none';
+}
+
+async function analyzeUpload() {
+  if (!selectedFile) return;
+  const fd = new FormData();
+  fd.append('image', selectedFile);
+  await runRecognize(() => fetch('/api/recognize', { method: 'POST', body: fd }), 'analyzeBtnUpload');
+}
+
+// ── Camera ────────────────────────────────────────────────────────────────────
+let stream = null;
+let facingMode = 'environment';
+let capturedBlob = null;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
+    document.getElementById('cameraVideo').srcObject = stream;
+    document.getElementById('camStartWrap').style.display   = 'none';
+    document.getElementById('camLiveWrap').style.display    = 'block';
+    document.getElementById('camPreviewWrap').style.display = 'none';
+    document.getElementById('camActionRow').style.display   = 'none';
+  } catch (e) {
+    alert('Tidak dapat mengakses kamera: ' + e.message);
+  }
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  stopCamera();
+  await startCamera();
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+}
+
+function capturePhoto() {
+  const video  = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('canvasCapture');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    capturedBlob = blob;
+    document.getElementById('camPreviewImg').src = URL.createObjectURL(blob);
+    document.getElementById('camLiveWrap').style.display    = 'none';
+    document.getElementById('camPreviewWrap').style.display = 'block';
+    document.getElementById('camActionRow').style.display   = 'flex';
+    stopCamera();
+  }, 'image/jpeg', 0.92);
+}
+
+function retakePhoto() {
+  capturedBlob = null;
+  document.getElementById('camPreviewWrap').style.display = 'none';
+  document.getElementById('camActionRow').style.display   = 'none';
+  document.getElementById('resultBox').style.display      = 'none';
+  startCamera();
+}
+
+async function analyzeCam() {
+  if (!capturedBlob) return;
+  const fd = new FormData();
+  fd.append('image', capturedBlob, 'capture.jpg');
+  await runRecognize(() => fetch('/api/recognize', { method: 'POST', body: fd }), 'analyzeBtnCam');
+}
+
+// ── Base64 ────────────────────────────────────────────────────────────────────
+function onB64Input() {
+  const val = document.getElementById('b64Input').value.trim();
+  const img  = document.getElementById('b64PreviewImg');
+  if (!val) { clearB64(); return; }
+  const src = val.startsWith('data:') ? val : 'data:image/jpeg;base64,' + val;
+  img.onload = () => {
+    document.getElementById('b64InputWrap').style.display   = 'none';
+    document.getElementById('b64PreviewWrap').style.display = 'block';
+    document.getElementById('b64ResetBtn').style.display    = 'inline-flex';
+    document.getElementById('analyzeBtnB64').disabled       = false;
+  };
+  img.onerror = () => {
+    document.getElementById('analyzeBtnB64').disabled = true;
+  };
+  img.src = src;
+}
+
+function clearB64() {
+  document.getElementById('b64Input').value = '';
+  document.getElementById('b64PreviewImg').src = '';
+  document.getElementById('b64InputWrap').style.display   = 'block';
+  document.getElementById('b64PreviewWrap').style.display = 'none';
+  document.getElementById('b64ResetBtn').style.display    = 'none';
+  document.getElementById('analyzeBtnB64').disabled       = true;
+  document.getElementById('resultBox').style.display      = 'none';
+}
+
+async function analyzeB64() {
+  const val = document.getElementById('b64Input').value.trim();
+  if (!val) return;
+  await runRecognize(() => fetch('/api/recognize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: val }),
+  }), 'analyzeBtnB64');
+}
+
+// ── Shared ────────────────────────────────────────────────────────────────────
+async function runRecognize(fetchFn, btnId) {
+  document.getElementById('loading').style.display   = 'block';
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById(btnId).disabled = true;
+  try {
+    const res  = await fetchFn();
+    const data = await res.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    renderResult(data);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById(btnId).disabled = false;
+  }
+}
+
+function renderResult(data) {
+  const rec = data.recognition;
+  const cat = data.category;
+
+  document.getElementById('itemNameDisplay').textContent = rec.item_name || cat;
+  document.getElementById('catBadge').textContent        = cat;
+
+  const conf = rec.confidence || '';
+  document.getElementById('confVal').innerHTML     = `<span class="conf-${conf}">${conf}</span>`;
+  document.getElementById('scoreText').textContent = `${rec.score}%`;
+  document.getElementById('itemDesc').textContent  = rec.item_description || '-';
+
+  const reasonBox = document.getElementById('reasonBox');
+  if (rec.reason) { reasonBox.textContent = rec.reason; reasonBox.style.display = 'block'; }
+  else { reasonBox.style.display = 'none'; }
+
+  const bars = document.getElementById('barsContainer');
+  bars.innerHTML = '';
+  Object.entries(rec.scores_per_category || {}).sort((a, b) => b[1] - a[1]).forEach(([c, v]) => {
+    bars.innerHTML += `<div class="bar-row">
+      <div class="bar-label">${c}</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(v,100)}%"></div></div>
+      <div class="bar-val">${v}%</div>
+    </div>`;
+  });
+
+  document.getElementById('resultBox').style.display = 'block';
+  document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
