@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify, render_template
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from functools import wraps
 import base64
-from config import MAX_CONTENT_LENGTH, ALLOWED_EXTENSIONS, CATEGORIES, GEMINI_API_KEY
+from config import MAX_CONTENT_LENGTH, ALLOWED_EXTENSIONS, CATEGORIES, GEMINI_API_KEY, X_API_KEY
 from prompt import recognize_image
 
 app = Flask(__name__)
@@ -14,6 +15,16 @@ limiter = Limiter(
     default_limits=["20 per minute"],
     headers_enabled=True,  # kirim header X-RateLimit-* ke client
 )
+
+# ─── Auth ─────────────────────────────────────────────────────────────────────
+def require_api_key(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        key = request.headers.get('X-API-KEY')
+        if not X_API_KEY or key != X_API_KEY:
+            return jsonify({'error': 'Unauthorized: X-API-KEY tidak valid'}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def allowed_file(filename: str) -> bool:
@@ -47,8 +58,17 @@ def rate_limit_exceeded(e):
 def index():
     return render_template('index.html')
 
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({
+        'status': 'ok',
+        'gemini_api_key': 'configured' if GEMINI_API_KEY else 'missing',
+        'x_api_key':      'configured' if X_API_KEY else 'missing',
+    })
+
 @app.route('/api/recognize', methods=['POST'])
 @limiter.limit("20 per minute")
+@require_api_key
 def recognize():
     try:
         image_bytes = extract_image_bytes(request)
@@ -66,6 +86,7 @@ def recognize():
 
 @app.route('/api/identify', methods=['POST'])
 @limiter.limit("20 per minute")
+@require_api_key
 def identify():
     """
     Lightweight endpoint — hanya kembalikan nama barang.
